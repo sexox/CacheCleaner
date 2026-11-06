@@ -53,12 +53,10 @@ jobs:
 
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
 
-      - name: Prepare Android platform
-        run: |
-          cd "$APP_DIR"
-          if [ ! -d android ]; then
-            flutter create . --platforms=android
-          fi
+      
+      - name: Fix intl dependency
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter pub add intl:^0.20.3
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
