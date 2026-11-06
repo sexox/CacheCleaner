@@ -1,4 +1,5 @@
-name: Build SMART SCHOOL ZONE APK
+
+name: Extract ZIP Project
 
 on:
   workflow_dispatch:
@@ -7,36 +8,33 @@ on:
       - main
 
 jobs:
-  build:
+  extract:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
+      - name: Download repository files
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+      - name: Extract ZIP automatically
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
-      - name: Install dependencies
-        working-directory: app
-        run: flutter pub get
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No ZIP file found!"
+            exit 1
+          fi
 
-      - name: Build Android APK
-        working-directory: app
-        run: flutter build apk --release
+          echo "Extracting: $ZIP_FILE"
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: SMART-SCHOOL-ZONE-APK
-          path: app/build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
+          unzip -o "$ZIP_FILE" -d .
+
+          echo "Extraction completed successfully!"
+
+      - name: Show extracted files
+        run: |
+          echo "Repository files:"
+          ls -la
+          find . -maxdepth 3 -name pubspec.yaml
