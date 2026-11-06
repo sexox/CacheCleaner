@@ -12,11 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Download repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Extract ZIP
       - name: Extract project ZIP
         run: |
           sudo apt-get update
@@ -25,81 +23,63 @@ jobs:
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found in repository root"
+            echo "ERROR: ZIP file not found"
             exit 1
           fi
 
           mkdir -p source
           unzip -o "$ZIP_FILE" -d source
 
-          echo "ZIP extracted successfully"
-
-      # 3. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # 4. Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      # 5. Locate Flutter project
       - name: Find Flutter project
         shell: bash
         run: |
-          APP_DIR=$(find source -type f -name pubspec.yaml -print -quit)
+          PUBSPEC=$(find source -type f -name pubspec.yaml -print -quit)
 
-          if [ -z "$APP_DIR" ]; then
+          if [ -z "$PUBSPEC" ]; then
             echo "ERROR: pubspec.yaml not found"
-            echo "Extracted files:"
-            find source -maxdepth 4 -type f | head -200
             exit 1
           fi
 
-          APP_DIR=$(dirname "$APP_DIR")
+          APP_DIR=$(dirname "$PUBSPEC")
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
 
-          echo "Flutter project: $APP_DIR"
-
-      # 6. Prepare Android
-      - name: Prepare Android platform
+      # إصلاح intl قبل إنشاء Android
+      - name: Fix intl dependency
+        working-directory: ${{ env.APP_DIR }}
         run: |
-          cd "$APP_DIR"
+          flutter pub add 'intl:^0.20.3'
 
+      - name: Prepare Android platform
+        working-directory: ${{ env.APP_DIR }}
+        run: |
           if [ ! -d android ]; then
             flutter create . --platforms=android
           fi
 
-      # 7. Fix intl conflict
-      - name: Fix intl dependency
+      - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
-        run: |
-          flutter pub add intl:^0.20.3
+        run: flutter pub get
 
-      # 8. Install dependencies
-      - name: Install Flutter dependencies
-        working-directory: ${{ env.APP_DIR }}
-        run: |
-          flutter pub get
-
-      # 9. Check Flutter project
       - name: Analyze Flutter project
         working-directory: ${{ env.APP_DIR }}
-        run: |
-          flutter analyze --no-pub
+        run: flutter analyze --no-pub
 
-      # 10. Build APK
       - name: Build Release APK
         working-directory: ${{ env.APP_DIR }}
-        run: |
-          flutter build apk --release
+        run: flutter build apk --release
 
-      # 11. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
