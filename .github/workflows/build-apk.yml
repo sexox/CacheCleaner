@@ -1,5 +1,5 @@
 
-name: Extract ZIP Project
+name: Build SMART SCHOOL ZONE APK
 
 on:
   workflow_dispatch:
@@ -8,14 +8,14 @@ on:
       - main
 
 jobs:
-  extract:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download repository files
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract ZIP automatically
+      - name: Extract ZIP
         run: |
           sudo apt-get update
           sudo apt-get install -y unzip
@@ -23,18 +23,54 @@ jobs:
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "No ZIP file found!"
+            echo "ERROR: ZIP file not found"
             exit 1
           fi
 
-          echo "Extracting: $ZIP_FILE"
+          mkdir -p source
+          unzip -o "$ZIP_FILE" -d source
 
-          unzip -o "$ZIP_FILE" -d .
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
-          echo "Extraction completed successfully!"
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
 
-      - name: Show extracted files
+      - name: Find Flutter project
         run: |
-          echo "Repository files:"
-          ls -la
-          find . -maxdepth 3 -name pubspec.yaml
+          APP_DIR=$(find source -type f -name pubspec.yaml -print -quit | xargs -r dirname)
+
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Flutter project not found"
+            exit 1
+          fi
+
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+
+      - name: Prepare Android platform
+        run: |
+          cd "$APP_DIR"
+          if [ ! -d android ]; then
+            flutter create . --platforms=android
+          fi
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SMART-SCHOOL-ZONE-APK
+          path: ${{ env.APP_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
